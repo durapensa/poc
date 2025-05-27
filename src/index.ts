@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { createInitCommand } from './commands/init';
 import { createSyncCommand } from './commands/sync';
 import { createListCommand } from './commands/list';
+import { createChatCommand } from './commands/chat-simple';
 
 const program = new Command();
 
@@ -15,5 +16,6 @@ program
 program.addCommand(createInitCommand());
 program.addCommand(createSyncCommand());
 program.addCommand(createListCommand());
+program.addCommand(createChatCommand());
 
 program.parse();
