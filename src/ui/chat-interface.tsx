@@ -93,7 +93,6 @@ export function ChatInterface({
           onChange={setInput}
           onSubmit={handleSubmit}
           placeholder={isLoading ? 'Waiting for Claude...' : 'Type your message...'}
-          disabled={isLoading}
         />
       </Box>
 

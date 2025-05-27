@@ -15,6 +15,7 @@ export interface Message {
   content: string;
   timestamp: Date;
   conversationId: string;
+  parentMessageId?: string;
 }
 
 export interface FullConversation extends ConversationMetadata {

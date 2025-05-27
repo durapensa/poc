@@ -181,6 +181,44 @@ export class SessionStore {
     }
   }
 
+  async saveConversationMessages(conversationId: string, messages: any[]): Promise<void> {
+    try {
+      FileManager.ensureDataDirectory();
+      
+      // Load existing conversation metadata
+      const conversations = await this.loadConversationsIndex();
+      const existingConv = conversations.find(c => c.id === conversationId);
+      
+      if (!existingConv) {
+        throw new Error(`Conversation ${conversationId} not found in index`);
+      }
+
+      // Create full conversation object
+      const fullConversation: FullConversation = {
+        id: conversationId,
+        title: existingConv.title,
+        createdAt: existingConv.createdAt,
+        updatedAt: existingConv.updatedAt,
+        messageCount: messages.length,
+        isDownloaded: true,
+        organizationId: existingConv.organizationId,
+        messages: messages,
+        localOnly: false
+      };
+
+      // Save to individual conversation file
+      const filePath = join(this.sessionsDir, `${conversationId}.json`);
+      const data = JSON.stringify(fullConversation, null, 2);
+      writeFileSync(filePath, data, { mode: 0o600 });
+
+      logger.success(`Saved full conversation with ${messages.length} messages: ${conversationId}`);
+
+    } catch (error) {
+      logger.error(`Failed to save conversation messages: ${conversationId}`, error as Error);
+      throw error;
+    }
+  }
+
   async getStats(): Promise<{
     totalConversations: number;
     downloadedConversations: number;

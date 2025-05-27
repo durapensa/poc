@@ -85,6 +85,43 @@ export class CurlApiClient {
     }
   }
 
+  async getConversationMessages(conversationId: string): Promise<any> {
+    try {
+      logger.info(`Fetching messages for conversation via curl: ${conversationId}`);
+      
+      const url = `https://claude.ai/api/organizations/${this.auth.organizationId}/chat_conversations/${conversationId}`;
+      const command = `curl -s '${url}' ` +
+        `-H 'anthropic-client-platform: web_claude_ai' ` +
+        `-b 'sessionKey=${this.auth.sessionToken}; lastActiveOrg=${this.auth.organizationId}' ` +
+        `-H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'`;
+
+      const { stdout, stderr } = await execAsync(command);
+      
+      if (stderr) {
+        logger.warn('Curl stderr: ' + stderr);
+      }
+
+      if (!stdout.trim()) {
+        throw new Error('Empty response from API');
+      }
+
+      // Parse the JSON response
+      const response = JSON.parse(stdout);
+      
+      logger.success(`Retrieved conversation details via curl`);
+      return response;
+
+    } catch (error: any) {
+      logger.error('Failed to fetch conversation messages via curl');
+      
+      if (error.message.includes('JSON')) {
+        logger.error('Invalid JSON response from curl - check token expiration');
+      }
+      
+      throw new Error(`Failed to fetch conversation messages: ${error.message}`);
+    }
+  }
+
   async testConnection(): Promise<boolean> {
     try {
       await this.getConversations();

@@ -11,6 +11,7 @@ export function createChatCommand(): Command {
     .description('Start interactive chat with Claude')
     .argument('[message]', 'Message to send (for non-interactive mode)')
     .option('-p, --print', 'Non-interactive mode - send message and print response')
+    .option('-s, --stream', 'Enable streaming responses (real-time typing effect)')
     .option('--continue [message]', 'Continue most recent conversation, optionally with a message')
     .option('--resume <conversation-id>', 'Resume specific conversation by ID')
     .option('--new', 'Force create a new conversation')
@@ -112,8 +113,37 @@ async function handlePrintMode(message: string, options: any) {
   }
   
   try {
-    const response = await messageClient.sendMessage(conversationId, message);
-    console.log(response.content);
+    // Get conversation context for parent message ID
+    const sessionStore = new SessionStore();
+    let parentMessageId: string | undefined = undefined;
+    
+    try {
+      const conversation = await sessionStore.loadFullConversation(conversationId);
+      if (conversation && conversation.messages && conversation.messages.length > 0) {
+        // Use the last message as parent context
+        const lastMessage = conversation.messages[conversation.messages.length - 1];
+        parentMessageId = lastMessage.id;
+      }
+    } catch (error) {
+      // If we can't load conversation context, continue without parent ID
+      logger.debug('Could not load conversation context for parent message ID');
+    }
+
+    if (options.stream) {
+      // Use streaming mode with parent context
+      let lastLength = 0;
+      await messageClient.sendMessageStreaming(conversationId, message, (chunk: string) => {
+        // Clear previous content and print new content
+        process.stdout.write('\r' + ' '.repeat(lastLength) + '\r');
+        process.stdout.write('🤖 Claude: ' + chunk);
+        lastLength = chunk.length + 12; // +12 for "🤖 Claude: "
+      }, parentMessageId);
+      console.log(); // Add final newline
+    } else {
+      // Use regular mode with parent context
+      const response = await messageClient.sendMessage(conversationId, message, parentMessageId);
+      console.log(response.content);
+    }
   } catch (error: any) {
     if (error.message.includes('Authentication failed')) {
       throw error; // Re-throw to be handled by main error handler
@@ -149,8 +179,36 @@ async function handleContinueMode(message: string | boolean, options: any) {
   // If message is provided, send it in print mode
   if (typeof message === 'string' && message.trim()) {
     try {
-      const response = await messageClient.sendMessage(mostRecent.id, message);
-      console.log(response.content);
+      // Get conversation context for parent message ID
+      let parentMessageId: string | undefined = undefined;
+      
+      try {
+        const conversation = await sessionStore.loadFullConversation(mostRecent.id);
+        if (conversation && conversation.messages && conversation.messages.length > 0) {
+          // Use the last message as parent context
+          const lastMessage = conversation.messages[conversation.messages.length - 1];
+          parentMessageId = lastMessage.id;
+        }
+      } catch (error) {
+        // If we can't load conversation context, continue without parent ID
+        logger.debug('Could not load conversation context for parent message ID');
+      }
+
+      if (options.stream) {
+        // Use streaming mode with parent context
+        let lastLength = 0;
+        await messageClient.sendMessageStreaming(mostRecent.id, message, (chunk: string) => {
+          // Clear previous content and print new content
+          process.stdout.write('\r' + ' '.repeat(lastLength) + '\r');
+          process.stdout.write('🤖 Claude: ' + chunk);
+          lastLength = chunk.length + 12; // +12 for "🤖 Claude: "
+        }, parentMessageId);
+        console.log(); // Add final newline
+      } else {
+        // Use regular mode with parent context
+        const response = await messageClient.sendMessage(mostRecent.id, message, parentMessageId);
+        console.log(response.content);
+      }
     } catch (error: any) {
       if (error.message.includes('Authentication failed')) {
         throw error; // Re-throw to be handled by main error handler

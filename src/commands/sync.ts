@@ -8,6 +8,9 @@ export function createSyncCommand(): Command {
     .option('--force', 'Force update all conversations regardless of timestamps')
     .option('--no-placeholders', 'Skip creating placeholder files for conversations')
     .option('--conversation <id>', 'Sync a specific conversation by ID')
+    .option('--download', 'Download full conversation content (not just metadata)')
+    .option('--download-all', 'Download full content for all conversations')
+    .option('--limit <number>', 'Limit number of conversations to process', '10')
     .option('--stats', 'Show sync statistics without performing sync')
     .action(async (options) => {
       try {
@@ -19,7 +22,7 @@ export function createSyncCommand(): Command {
         }
 
         if (options.conversation) {
-          await syncSingleConversation(sync, options.conversation);
+          await syncSingleConversation(sync, options.conversation, options);
           return;
         }
 
@@ -44,10 +47,17 @@ async function syncAllConversations(sync: ConversationSync, options: any): Promi
 
   const syncOptions = {
     force: options.force,
-    createPlaceholders: options.placeholders !== false
+    createPlaceholders: options.placeholders !== false,
+    downloadContent: options.download || options.downloadAll,
+    limit: parseInt(options.limit)
   };
 
   const result = await sync.syncConversations(syncOptions);
+
+  // Handle full content downloading
+  if (options.downloadAll) {
+    await downloadAllConversations(sync, options);
+  }
 
   // Display results
   logger.success('Sync completed successfully!');
@@ -65,19 +75,52 @@ async function syncAllConversations(sync: ConversationSync, options: any): Promi
     result.errors.forEach(error => logger.error(`  • ${error}`));
   }
 
-  if (result.newConversations > 0) {
+  if (result.newConversations > 0 && !options.downloadAll) {
     logger.info('Use "poc list" to see your conversations');
-    logger.info('Use "poc download <id>" to download full conversation content');
+    logger.info('Use "poc sync --download-all" to download full conversation content');
   }
 }
 
-async function syncSingleConversation(sync: ConversationSync, conversationId: string): Promise<void> {
+async function syncSingleConversation(sync: ConversationSync, conversationId: string, options: any): Promise<void> {
   logger.info(`Syncing conversation: ${conversationId}`);
   
   await sync.syncSingleConversation(conversationId);
   
+  if (options.download) {
+    logger.info('Downloading full conversation content...');
+    await sync.downloadConversation(conversationId);
+  }
+  
   logger.success('Conversation synced successfully!');
   logger.info('Use "poc list" to see updated conversation details');
+}
+
+async function downloadAllConversations(sync: ConversationSync, options: any): Promise<void> {
+  logger.info('Downloading full content for all conversations...');
+  
+  const sessionStore = new (await import('../storage/session-store')).SessionStore();
+  const conversations = await sessionStore.getConversationList();
+  
+  const limit = parseInt(options.limit);
+  const toDownload = conversations.slice(0, limit);
+  
+  logger.info(`Downloading ${toDownload.length} conversations (limited to ${limit})...`);
+  
+  let downloaded = 0;
+  let errors = 0;
+  
+  for (const conv of toDownload) {
+    try {
+      logger.info(`[${downloaded + 1}/${toDownload.length}] Downloading: ${conv.title}`);
+      await sync.downloadConversation(conv.id);
+      downloaded++;
+    } catch (error: any) {
+      logger.error(`Failed to download ${conv.id}: ${error.message}`);
+      errors++;
+    }
+  }
+  
+  logger.success(`Download complete! ${downloaded} successful, ${errors} errors`);
 }
 
 async function showStats(sync: ConversationSync): Promise<void> {

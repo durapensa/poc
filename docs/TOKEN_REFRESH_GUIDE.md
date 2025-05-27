@@ -17,7 +17,7 @@ poc init --manual --force
 
 # When prompted, enter:
 # - Fresh sessionKey from browser cookies
-# - Organization ID: 1ada8651-e431-4f80-b5da-344eb1d3d5fa
+# - Organization ID: ........-....-....-....-............
 ```
 
 ### Option 2: Manual Token Extraction
@@ -28,7 +28,7 @@ poc init --manual --force
    ```json
    {
      "sessionToken": "sk-ant-sid01-NEW_FRESH_TOKEN_HERE",
-     "organizationId": "1ada8651-e431-4f80-b5da-344eb1d3d5fa"
+     "organizationId": "........-....-....-....-............"
    }
    ```
 
@@ -36,8 +36,8 @@ poc init --manual --force
 To check if your current token is valid:
 ```bash
 # Test with curl using your current token
-curl -H "Cookie: sessionKey=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" \
-  "https://claude.ai/api/organizations/1ada8651-e431-4f80-b5da-344eb1d3d5fa/chat_conversations?limit=5&starred=false"
+curl -H "Cookie: sessionKey=sk-ant-....................................................................................................." \
+  "https://claude.ai/api/organizations/........-....-....-....-............/chat_conversations?limit=5&starred=false"
 ```
 
 ## What We've Confirmed Working

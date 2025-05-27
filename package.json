@@ -34,8 +34,10 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@types/blessed": "^0.1.25",
     "@types/inquirer": "^9.0.8",
     "axios": "^1.9.0",
+    "blessed": "^0.1.81",
     "chalk": "^5.4.1",
     "classic-level": "^3.0.0",
     "commander": "^14.0.0",

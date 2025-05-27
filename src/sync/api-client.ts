@@ -272,6 +272,22 @@ export class ClaudeApiClient {
     }
   }
 
+  async getConversationMessages(conversationId: string): Promise<any> {
+    try {
+      logger.info(`Fetching messages for conversation: ${conversationId}`);
+      
+      // Try the conversation detail endpoint first
+      const url = `/organizations/${this.auth.organizationId}/chat_conversations/${conversationId}`;
+      const response = await this.client.get(url);
+      
+      return response.data;
+      
+    } catch (error: any) {
+      logger.error('Failed to fetch conversation messages', error);
+      throw new Error(`Failed to fetch conversation messages: ${error.message}`);
+    }
+  }
+
   async sendMessage(conversationId: string, content: string): Promise<any> {
     try {
       logger.info('Sending message...');

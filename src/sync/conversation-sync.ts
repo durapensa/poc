@@ -200,20 +200,77 @@ export class ConversationSync {
       // Check if conversation exists in index
       const hasConversation = await this.sessionStore.hasConversation(conversationId);
       if (!hasConversation) {
-        throw new Error(`Conversation ${conversationId} not found in index. Run sync first.`);
+        logger.warn(`Conversation ${conversationId} not found in index. Syncing first...`);
+        await this.syncSingleConversation(conversationId);
       }
 
-      // For now, this is a placeholder - we need to implement the actual message fetching
-      // This would require discovering the messages endpoint
-      logger.warn('Full conversation download not yet implemented');
-      logger.info('This feature requires discovering the messages API endpoint');
+      // Try to fetch conversation messages, with curl fallback
+      let conversationData;
+      let usingCurl = false;
+      
+      try {
+        conversationData = await this.apiClient.getConversationMessages(conversationId);
+      } catch (error) {
+        logger.warn('Direct API failed for messages, trying curl fallback...');
+        conversationData = await this.curlClient.getConversationMessages(conversationId);
+        usingCurl = true;
+      }
 
-      // Mark as downloaded (placeholder for now)
+      if (usingCurl) {
+        logger.success('Retrieved conversation via curl fallback');
+      }
+
+      // Parse and save the conversation data
+      await this.processConversationMessages(conversationId, conversationData);
+      
+      // Mark as downloaded
       await this.sessionStore.markAsDownloaded(conversationId);
-      logger.success(`Conversation ${conversationId} marked as downloaded`);
+      logger.success(`Conversation ${conversationId} downloaded successfully`);
 
     } catch (error: any) {
       logger.error(`Failed to download conversation ${conversationId}`, error);
+      throw error;
+    }
+  }
+
+  private async processConversationMessages(conversationId: string, conversationData: any): Promise<void> {
+    try {
+      // Extract messages from the API response
+      // The actual structure depends on what the API returns
+      let messages = [];
+      
+      if (conversationData.messages) {
+        messages = conversationData.messages;
+      } else if (conversationData.chat_messages) {
+        messages = conversationData.chat_messages;
+      } else if (Array.isArray(conversationData)) {
+        messages = conversationData;
+      } else {
+        logger.warn('No messages found in conversation data. Response keys: ' + Object.keys(conversationData).join(', '));
+        return;
+      }
+
+      if (messages.length === 0) {
+        logger.info('No messages found in conversation');
+        return;
+      }
+
+      // Convert to our message format
+      const formattedMessages = messages.map((msg: any, index: number) => ({
+        id: msg.uuid || msg.id || `msg_${index}`,
+        role: msg.sender === 'human' ? 'human' : 'assistant',
+        content: msg.text || msg.content || '',
+        timestamp: new Date(msg.created_at || msg.timestamp || Date.now()),
+        conversationId: conversationId,
+        parentMessageId: msg.parent_message_uuid || undefined
+      }));
+
+      // Save messages to storage
+      await this.sessionStore.saveConversationMessages(conversationId, formattedMessages);
+      logger.success(`Saved ${formattedMessages.length} messages for conversation ${conversationId}`);
+
+    } catch (error: any) {
+      logger.error('Failed to process conversation messages', error);
       throw error;
     }
   }
