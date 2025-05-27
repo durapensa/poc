@@ -61,6 +61,29 @@ export function createInitCommand(): Command {
     });
 }
 
+export async function performTokenAuthentication(forceManual: boolean = false): Promise<void> {
+  logger.info('Initializing POC...');
+
+  let tokens;
+
+  if (forceManual) {
+    tokens = await promptForManualTokens();
+  } else {
+    tokens = await extractTokensFromChrome({});
+  }
+
+  if (!tokens) {
+    throw new Error('Failed to obtain authentication tokens');
+  }
+
+  if (!TokenExtractor.validateTokens(tokens)) {
+    throw new Error('Provided tokens appear to be invalid');
+  }
+
+  FileManager.saveAuthTokens(tokens);
+  logger.success('Authentication tokens saved successfully!');
+}
+
 async function promptForManualTokens() {
   logger.info('Manual token input mode');
   logger.info('You will need to extract tokens from your browser.');

@@ -68,18 +68,18 @@ function displayConversationsTable(conversations: ConversationMetadata[], option
 
   // Table header
   const headers = [
-    chalk.bold('ID'),
+    chalk.bold('Conversation ID'),
     chalk.bold('Title'),
     chalk.bold('Updated'),
     chalk.bold('Messages'),
     chalk.bold('Status')
   ];
 
-  const idWidth = 12;
-  const titleWidth = 40;
+  const idWidth = 38; // Full UUID width
+  const titleWidth = 35; // Reduced title width
   const dateWidth = 12;
   const msgWidth = 8;
-  const statusWidth = 12;
+  const statusWidth = 8; // Shortened status column
 
   console.log(
     headers[0].padEnd(idWidth) +
@@ -93,13 +93,13 @@ function displayConversationsTable(conversations: ConversationMetadata[], option
 
   // Table rows
   conversations.forEach(conv => {
-    const id = conv.id.substring(0, 10) + (conv.id.length > 10 ? '...' : '');
+    const id = conv.id; // Show full conversation ID
     const title = truncateText(conv.title, titleWidth - 2);
     const date = formatDate(conv.updatedAt);
     const messages = conv.messageCount.toString();
     const status = conv.isDownloaded ? 
-      chalk.green('Downloaded') : 
-      chalk.yellow('Placeholder');
+      chalk.green('Down') : 
+      chalk.yellow('Place'); // Shortened status labels
 
     console.log(
       chalk.cyan(id.padEnd(idWidth)) +
