@@ -22,7 +22,7 @@ export function ChatInterface({
   const [messages, setMessages] = useState<Message[]>(conversation?.messages || []);
   const { exit } = useApp();
 
-  useInput((input, key) => {
+  useInput((input: string, key: any) => {
     if ((key.ctrl && input === 'c') || (key.ctrl && input === 'd')) {
       onExit();
       exit();

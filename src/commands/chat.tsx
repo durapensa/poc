@@ -46,11 +46,14 @@ async function startChatSession(conversationId?: string, options?: any) {
   if (conversationId && !options.new) {
     logger.info(`Loading conversation: ${conversationId}`);
     
-    conversation = await sessionStore.loadFullConversation(conversationId);
-    if (!conversation) {
+    const loadedConversation = await sessionStore.loadFullConversation(conversationId);
+    if (!loadedConversation) {
       logger.warn(`Conversation ${conversationId} not found locally`);
       logger.info('Creating new conversation instead...');
       currentConversationId = undefined;
+    } else {
+      conversation = loadedConversation;
+      currentConversationId = conversationId;
     }
   }
 
