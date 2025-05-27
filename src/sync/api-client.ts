@@ -18,6 +18,9 @@ export interface ApiConversationList {
   next_cursor?: string;
 }
 
+// The actual response is just an array, not wrapped in an object
+export type ApiConversationResponse = ApiConversation[];
+
 export interface ApiError {
   error: string;
   message: string;
@@ -34,14 +37,25 @@ export class ClaudeApiClient {
       baseURL: 'https://claude.ai/api',
       timeout: 30000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
+        'Accept': '*/*',
         'Accept-Language': 'en-US,en;q=0.9',
+        'Content-Type': 'application/json',
+        'anthropic-client-platform': 'web_claude_ai',
+        'anthropic-client-version': 'unknown',
+        'anthropic-client-sha': 'unknown',
+        'anthropic-device-id': '9e375fc5-ab10-418c-ac42-141811bc1825',
+        'anthropic-anonymous-id': 'dc893078-42fd-4638-9048-3a30469b5933',
+        'baggage': 'sentry-environment=production,sentry-release=b73a1104b7057aff58c453d8efae475601e2e811,sentry-public_key=58e9b9d0fc244061a1b54fe288b0e483,sentry-trace_id=b938057cfd704e009e762cef10a8c4c1,sentry-sample_rate=0.01,sentry-sampled=false',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
         'Referer': 'https://claude.ai/',
         'Origin': 'https://claude.ai',
         'Sec-Fetch-Dest': 'empty',
         'Sec-Fetch-Mode': 'cors',
         'Sec-Fetch-Site': 'same-origin',
+        'Sec-Ch-Ua': '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"macOS"',
+        'Priority': 'u=1, i'
       }
     });
 
@@ -50,8 +64,9 @@ export class ClaudeApiClient {
   }
 
   private setupAuthentication(): void {
-    // Set authentication headers
-    this.client.defaults.headers.common['Cookie'] = `sessionKey=${this.auth.sessionToken}`;
+    // Use the complete cookie string from working browser session
+    const cookieString = `activitySessionId=131d246a-de60-4e07-b294-55a6699743a1; anthropic-device-id=9e375fc5-ab10-418c-ac42-141811bc1825; ajs_anonymous_id=dc893078-42fd-4638-9048-3a30469b5933; CH-prefers-color-scheme=dark; cf_clearance=Cjd3O1vFpSMT46rdwb3GU8X.gOj.Ucl7uMmsh4plexk-1748372491-1.2.1.1-B7GLmEEHpdJdOqES1bIs5ZcecFo7qBwcMUd6B6KO9N..C_k5fZQacqrJosMGDDXCAxTYM2ijmGXhakGMBPj7O8Jc0zPJmLXKS6gTJK0K5mvkd5NIxWjgW9absf6SsL1CMXYTSs2YuJrntIrJ1y.eZhzxvMgDp50F52fU2O5r7ruspahwKYxON6046RGB65Oz_XgfA6YpG3gXZwY.ZztxrFMTidQWfGA6hgMKez1CtcAYJAL3t5L0RY5wUCkXAlPfAP4O0D6nH2H9H4T_MUoPcUoQSXV321LOchrDmu63RCkKMh_2C1ShSrX_IeUhvo3StTpNS3f1yJNiBXaZgQ81opQ1eV0b8Jcz5x.DeH9beFU; __ssid=dbb0bd6ca90d8571816366c06a4c2df; lastActiveOrg=${this.auth.organizationId}; intercom-device-id-lupk8zyo=372790a8-ba08-4696-9b57-f6db0053e92d; sessionKey=${this.auth.sessionToken}; intercom-session-lupk8zyo=WjhMTGp2blNTRkRidlljNENvb3ZtNGZUQWllYnBFMlJhVVZpa2RFWmRJQnRYMkN5OFpwZTY1cHFRNG8xSS8xTDVOY1hBOEZ0UEFkNkJCREVLNDZhck5XUUJiakN2K1UyOWV3b3JRMlpXRlk9LS1abG9lby9VWm5xUkJ3eWVFUkdQWUNBPT0=--06381b0061a4f37885a86ec487610755afa766df; user-sidebar-visible-on-load=false; __cf_bm=781vgbuexkEiHllgPPZY.Db3KYKRbbPB2q8Ok6bxeZg-1748374291-1.0.1.1-s_5pAMQXwYZRwJQH8ix8DMIsTxhQQ3K0OSooomjd_JXmKvoSCX4vKY2bhvc7cBowo4XzCI_I6V4EtC2rAFrgvZfpUeJau15GhAnzL_VuoEU`;
+    this.client.defaults.headers.common['Cookie'] = cookieString;
     
     if (this.auth.csrfToken) {
       this.client.defaults.headers.common['X-CSRF-Token'] = this.auth.csrfToken;
@@ -115,6 +130,24 @@ export class ClaudeApiClient {
     );
   }
 
+  private generateDeviceId(): string {
+    // Generate a UUID-like device ID
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  private generateAnonymousId(): string {
+    // Generate a UUID-like anonymous ID
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
   private sanitizeHeaders(headers: any): any {
     const sanitized = { ...headers };
     if (sanitized.Cookie) {
@@ -130,10 +163,17 @@ export class ClaudeApiClient {
     try {
       logger.info('Fetching conversation list...');
       
+      // Use the real Claude API endpoint with query parameters
       const url = `/organizations/${this.auth.organizationId}/chat_conversations`;
-      const response = await this.client.get<ApiConversationList>(url);
+      const params = {
+        limit: 30,
+        starred: false // Get all conversations, not just starred
+      };
+      
+      const response = await this.client.get<ApiConversationResponse>(url, { params });
 
-      const conversations: ConversationMetadata[] = response.data.conversations.map(conv => ({
+      // Response is a direct array, not wrapped in an object
+      const conversations: ConversationMetadata[] = response.data.map(conv => ({
         id: conv.uuid,
         title: conv.name || 'Untitled Conversation',
         createdAt: new Date(conv.created_at),

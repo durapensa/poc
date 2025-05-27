@@ -1,4 +1,5 @@
 import { ClaudeApiClient } from './api-client';
+import { CurlApiClient } from './curl-client';
 import { SessionStore } from '../storage/session-store';
 import { FileManager } from '../storage/file-manager';
 import { ConversationMetadata } from '../types/conversation';
@@ -13,6 +14,7 @@ export interface SyncResult {
 
 export class ConversationSync {
   private apiClient: ClaudeApiClient;
+  private curlClient: CurlApiClient;
   private sessionStore: SessionStore;
 
   constructor() {
@@ -22,6 +24,7 @@ export class ConversationSync {
     }
 
     this.apiClient = new ClaudeApiClient(auth);
+    this.curlClient = new CurlApiClient(auth);
     this.sessionStore = new SessionStore();
   }
 
@@ -39,15 +42,31 @@ export class ConversationSync {
     try {
       logger.info('Starting conversation sync...');
 
-      // Test API connection first
-      const connectionOk = await this.apiClient.testConnection();
+      // Test API connection first, with curl fallback
+      logger.info('Testing API connection...');
+      let connectionOk = await this.apiClient.testConnection();
+      let usingCurl = false;
+      
       if (!connectionOk) {
-        throw new Error('API connection test failed. Check your authentication tokens.');
+        logger.warn('Direct API connection failed, trying curl fallback...');
+        connectionOk = await this.curlClient.testConnection();
+        usingCurl = true;
+      }
+      
+      if (!connectionOk) {
+        throw new Error('Both direct API and curl connection failed. Check your authentication tokens.');
       }
 
       // Fetch remote conversations
-      logger.info('Fetching conversations from Claude API...');
-      const remoteConversations = await this.apiClient.getConversations();
+      if (usingCurl) {
+        logger.info('Fetching conversations using curl (direct API blocked)...');
+      } else {
+        logger.info('Fetching conversations from Claude API...');
+      }
+      
+      const remoteConversations = usingCurl 
+        ? await this.curlClient.getConversations()
+        : await this.apiClient.getConversations();
       
       if (remoteConversations.length === 0) {
         logger.warn('No conversations found in Claude account');
@@ -208,7 +227,17 @@ export class ConversationSync {
     };
   }> {
     try {
-      const apiConnected = await this.apiClient.testConnection();
+      // Test both API and curl connection
+      let apiConnected = await this.apiClient.testConnection();
+      
+      if (!apiConnected) {
+        logger.warn('Direct API failed, testing curl fallback...');
+        apiConnected = await this.curlClient.testConnection();
+        if (apiConnected) {
+          logger.success('Curl fallback connection successful');
+        }
+      }
+      
       const localStats = await this.sessionStore.getStats();
 
       return {
@@ -217,7 +246,7 @@ export class ConversationSync {
       };
 
     } catch (error) {
-      logger.debug('Failed to get sync stats', error);
+      logger.debug('Failed to get sync stats');
       return {
         api: false,
         local: {
