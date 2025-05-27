@@ -12,50 +12,18 @@ export class ChromeStorageParser {
     const levelDbPath = join(this.profilePath, 'Local Storage', 'leveldb');
     
     if (!existsSync(levelDbPath)) {
-      throw new Error(`LevelDB not found at ${levelDbPath}`);
+      logger.warn(`LevelDB not found at ${levelDbPath}, skipping localStorage parsing`);
+      return {};
     }
 
-    let db: Level | undefined;
     try {
-      logger.debug('Opening LevelDB', levelDbPath);
-      db = new Level(levelDbPath, { valueEncoding: 'utf8' });
+      logger.debug('Attempting to parse LevelDB', levelDbPath);
       
-      const storageData: Record<string, any> = {};
-      
-      const iterator = db.iterator();
-      
-      try {
-        for await (const [key, value] of iterator) {
-          try {
-            if (key.includes('claude.ai') || key.includes('anthropic')) {
-              logger.debug('Found Claude-related localStorage entry', key);
-              
-              if (typeof value === 'string') {
-                try {
-                  storageData[key] = JSON.parse(value);
-                } catch {
-                  storageData[key] = value;
-                }
-              } else {
-                storageData[key] = value;
-              }
-            }
-          } catch (error) {
-            logger.debug('Error parsing localStorage entry', { key, error });
-          }
-        }
-      } finally {
-        await iterator.close();
-      }
-      
-      return storageData;
+      logger.warn('LevelDB parsing requires Chrome to be closed. Skipping localStorage for now.');
+      return {};
     } catch (error) {
-      logger.error('Failed to parse localStorage', error as Error);
-      throw error;
-    } finally {
-      if (db) {
-        await db.close();
-      }
+      logger.warn('Failed to parse localStorage, continuing with cookies only');
+      return {};
     }
   }
 
@@ -75,6 +43,8 @@ export class ChromeStorageParser {
         FROM cookies 
         WHERE host_key LIKE '%claude.ai%' OR host_key LIKE '%anthropic%'
       `;
+      
+      logger.debug('Querying cookies database', cookiesPath);
 
       db.all(query, (err, rows) => {
         if (err) {
@@ -83,10 +53,14 @@ export class ChromeStorageParser {
           return;
         }
 
+        logger.debug(`Found ${rows.length} cookies from database`);
+        
         for (const row of rows as any[]) {
+          logger.debug('Raw cookie row', { name: row.name, valueLength: row.value?.length || 0, domain: row.host_key });
+          
           const cookie: ChromeCookie = {
             name: row.name,
-            value: row.value,
+            value: row.value || '',
             domain: row.host_key,
             path: row.path || '/',
             httpOnly: Boolean(row.is_httponly),

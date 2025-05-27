@@ -41,8 +41,12 @@ export class TokenExtractor {
       }
     }
 
+    logger.debug('Processing cookies', { count: cookies.length });
+    
     for (const cookie of cookies) {
       try {
+        logger.debug('Found cookie', { name: cookie.name, domain: cookie.domain, valueLength: cookie.value.length });
+        
         if (cookie.name.includes('session') && cookie.value.length > 20) {
           sessionToken = sessionToken || cookie.value;
           logger.debug('Found session token in cookies', cookie.name);
@@ -64,11 +68,12 @@ export class TokenExtractor {
 
     if (!sessionToken) {
       logger.warn('No session token found in Chrome storage');
+      logger.info('Make sure you are logged in to claude.ai in Chrome and try again');
       return null;
     }
 
     if (!organizationId) {
-      logger.warn('No organization ID found, using default');
+      logger.warn('No organization ID found, this may cause issues with API calls');
       organizationId = 'unknown';
     }
 
